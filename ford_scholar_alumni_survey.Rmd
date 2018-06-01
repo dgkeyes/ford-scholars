@@ -544,7 +544,6 @@ gitbook(split_by = "section+number",
 
 render_book("ford_scholar_alumni_survey.Rmd", 
             "bookdown::gitbook", 
-            output_dir = "bookdown",
-            clean = TRUE)
+            output_dir = "bookdown")
 
 ```
