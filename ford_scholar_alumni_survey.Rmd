@@ -1,6 +1,8 @@
 ---
 title: "Ford scholars alumni survey"
-output: html_document
+output:
+  html_document:
+    css: style.css
 ---
 
 ```{r setup, include=FALSE}
@@ -18,72 +20,11 @@ library(scales)
 library(ggiraph)
 library(bookdown)
 library(skimr)
+library(friendlyeval)
+library(rlang)
 
-# gs_title("Alumni Engagement Survey Results") %>%
-#      gs_download(to = "data/alumni_survey.xlsx",
-#                  overwrite = T)
+source("data_functions_themes.R")
 
-zips <- read_excel("data/TFFF Rural Zip Codes.xlsx") %>%
-     clean_names() %>%
-     select(-c(zip_code_map, tfff_1_1)) %>%
-     remove_empty("rows") %>%
-     mutate(zip_code_chr = as.character(zip_code))
-
-data <- read_excel("data/alumni_survey.xlsx") %>%
-     clean_names() %>%
-     mutate(longitude = as.numeric(longitude)) %>%
-     mutate(latitude = as.numeric(latitude)) %>%
-     left_join(zips, by = c("what_is_the_zip_code_for_your_current_residence" = "zip_code_chr")) %>%
-     mutate(age = 2018 - what_year_were_you_born) %>%
-     mutate(lives_in_oregon = ifelse(is.na(tfff_classification), 
-                   "Lives outside Oregon",
-                   "Lives in Oregon")) %>%
-     mutate(years_since_grad = 2018 - what_year_did_you_graduate_from_college) %>%
-mutate(years_since_grad_grouped = case_when(
-          years_since_grad < 2 ~ "0-2 years",
-          years_since_grad < 5 & years_since_grad > 2 ~ "3-5 years",
-          years_since_grad < 10 & years_since_grad < 5 ~ "6-10 years",
-          years_since_grad < 15 & years_since_grad < 10 ~ "11-15 years",
-          TRUE ~ "15+ years"
-     )) %>%
-       mutate(years_since_grad_grouped = factor(years_since_grad_grouped,
-                                              levels = rev(c("0-2 years",
-                                                         "3-5 years",
-                                                         "6-10 years",
-                                                         "11-15 years",
-                                                         "15+ years")))) %>%
-          mutate(highest_level_of_education_completed_or_in_progress = fct_rev(highest_level_of_education_completed_or_in_progress))
-
-# Theme -------------------------------------------------------------------
-
-tfff.dark.green <- "#265142"
-tfff.light.green <- "#B5CC8E"
-tfff.orange <- "#e65100"
-tfff.yellow <- "#FBC02D"
-tfff.blue <- "#283593"
-tfff.red <- "#B71C1C"
-tfff.brown <- "#51261C"
-tfff.dark.gray <- "#545454"
-tfff.medium.gray <- "#a8a8a8"
-tfff.light.gray <- "#eeeeee"
-
-# Functions
-
-dk_pie_chart <- function(df) {
-     df %>%
-          ggplot(aes(x = "", 
-                y = pct,
-                fill = factor(item))) +
-     geom_bar(stat = "identity",
-              width = 1) +
-     geom_text(aes(label = percent(pct)),
-               position = position_stack(vjust = 0.5),
-               color = "white") +
-     coord_polar("y") +
-     theme_void() +
-     theme(legend.position = "bottom") +
-          labs(fill = "") 
-}
 
 ```
 
@@ -91,6 +32,23 @@ dk_pie_chart <- function(df) {
 # Demographics
 
 In total, there were 314 respondents.
+
+## Type of scholarship
+```{r fig.height = 3}
+
+data %>%
+     group_by(under_which_ford_family_program_did_you_receive_your_scholarship) %>%
+     summarize(n = n()) %>%
+     ggplot(aes(x = under_which_ford_family_program_did_you_receive_your_scholarship, y = n)) +
+     geom_col(fill = tfff.dark.green) +
+          geom_text(aes(label = n),
+               vjust = -.5,
+               color = tfff.dark.green) +
+     dk_theme +
+     theme(axis.title = element_blank()) +
+     scale_y_continuous(limits = c(0, 225))
+
+```
 
 ## Where do respondents live?
 
@@ -119,16 +77,26 @@ data %>%
 
 ### Within Oregon vs outside Oregon
 
-72% of respondents live in Oregon. 28% live outside of Oregon.
 
-```{r include = FALSE}
+```{r fig.height = 2}
 
 data %>%
      group_by(lives_in_oregon) %>%
      count() %>%
      ungroup() %>%
      mutate(pct = round(prop.table(n), digits = 2)) %>%
-     ungroup()
+     ungroup() %>%
+      ggplot(aes(x = lives_in_oregon, y = pct)) +
+     geom_col(fill = tfff.dark.green) +
+          geom_text(aes(label = percent(pct)),
+               hjust = -.5,
+               color = tfff.dark.green) +
+     coord_flip() +
+     dk_theme +
+     theme(axis.title = element_blank()) +
+     scale_y_continuous(limits = c(0, .9),
+                        labels = percent)
+
 
 ```
 
@@ -177,35 +145,61 @@ ggiraph(code = print(m))
 
 ### Rural
 
-In total, 36% of respondents live in zip codes TFFF considers rural. 64% live in urban zip codes. Note that this does not include those who live outside of Oregon.
-
-```{r eval = F}
+```{r}
 
 data %>%
-     select(tfff_classification) %>%
-     filter(!is.na(tfff_classification)) %>%
-     group_by(tfff_classification) %>%
-     count() %>%
-     ungroup() %>%
-     mutate(pct = round(prop.table(n), digits = 2)) %>%
-     ungroup()
+     select(rural_or_not) %>%
+     group_by(rural_or_not) %>%
+     summarize(n = n()) %>%
+     ggplot(aes(x = rural_or_not, y = n)) +
+     geom_col(fill = tfff.dark.green) +
+          geom_text(aes(label = n),
+               vjust = -.5,
+               color = tfff.dark.green) +
+     dk_theme +
+     theme(axis.title = element_blank()) +
+     scale_y_continuous(limits = c(0, 175))
+     
 
 ```
 
 
 ## Age
 
+### Age of all respondents
+
 ```{r}
 data %>%
      ggplot(aes(x = age)) +
-     # geom_histogram(fill = tfff.dark.green) +
      geom_bar(fill = tfff.dark.green) +
-     labs(y = "Number of respondents",
-          x = "Age") +
-     theme_minimal() +
+     dk_theme +
+     labs(x = "Age",
+          y = "Number of respondents") +
      scale_x_continuous(breaks = pretty_breaks(n = 10))
 
 ```
+
+### Age of all respondents, grouped by decade
+
+```{r}
+
+data %>%
+     filter(age_groups != "No info") %>%
+     group_by(age_groups) %>%
+     summarize(n = n()) %>%
+     ggplot(aes(x = age_groups, y = n)) +
+     geom_col(fill = tfff.dark.green) +
+          geom_text(aes(label = n),
+               vjust = -.5,
+               color = tfff.dark.green) +
+     dk_theme +
+          labs(x = "Age",
+          y = "Number of respondents") +
+     scale_y_continuous(limits = c(0, 125))
+
+```
+
+
 
 ## Education
 
@@ -217,9 +211,8 @@ Note that some people were confused by whether to count their undergrad or highe
 data %>%
      ggplot(aes(x = what_year_did_you_graduate_from_college)) +
      geom_bar(fill = tfff.dark.green) +
-     labs(y = "Number of respondents",
-          x = "Year graduated") +
-     theme_minimal() +
+     dk_theme +
+     theme(axis.title  = element_blank()) +
      scale_x_continuous(breaks = pretty_breaks(n = 10))
 ```
 
@@ -236,10 +229,9 @@ data %>%
                 y = n)) +
      geom_col(fill = tfff.dark.green) +
      geom_text(aes(label = n),
-               hjust = -.5,
+               vjust = -.5,
                color = tfff.dark.green) +
-     coord_flip() +
-     theme_minimal() +
+     dk_theme +
      scale_y_continuous(limits = c(0, 150)) +
      theme(axis.title = element_blank())
      
@@ -259,10 +251,9 @@ data %>%
                 y = n)) +
      geom_col(fill = tfff.dark.green) +
      geom_text(aes(label = n),
-               hjust = -.5,
+               vjust = -.5,
                color = tfff.dark.green) +
-     coord_flip() +
-     theme_minimal() +
+     dk_theme +
      scale_y_continuous(limits = c(0, 175)) +
      theme(axis.title = element_blank())
 ```
@@ -287,35 +278,11 @@ data %>%
                hjust = -.5,
                color = tfff.dark.green) +
      coord_flip() +
-     theme_minimal() +
+     dk_theme +
      scale_y_continuous(limits = c(0, 90)) +
      theme(axis.title = element_blank())
 ```
 
-## Type of scholarship
-```{r}
-data %>%
-     select(under_which_ford_family_program_did_you_receive_your_scholarship) %>%
-     filter(!is.na(under_which_ford_family_program_did_you_receive_your_scholarship)) %>%
-     group_by(under_which_ford_family_program_did_you_receive_your_scholarship) %>%
-     count() %>%
-     ungroup() %>%
-     mutate(pct = round(prop.table(n), digits = 2)) %>%
-     ungroup() %>%
-     ggplot(aes(x = "", 
-                y = pct,
-                fill = factor(under_which_ford_family_program_did_you_receive_your_scholarship))) +
-     geom_bar(stat = "identity",
-              width = 1) +
-     geom_text(aes(label = percent(pct)),
-               position = position_stack(vjust = 0.5),
-               color = "white") +
-     coord_polar("y") +
-     theme_void() +
-     theme(legend.position = "bottom") +
-     labs(fill = "") +
-     scale_fill_manual(values = rev(c(tfff.dark.green, tfff.light.green, tfff.yellow)))
-```
 
 
 
@@ -327,138 +294,42 @@ data %>%
 
 
 
-
-
-# Demographics across variables
-
-## Within Oregon vs outside of Oregon
-
-### By scholarship type
-
-```{r}
-
-data %>%
-     select(city, county, tfff_classification, under_which_ford_family_program_did_you_receive_your_scholarship) %>%
-     mutate(lives_in_oregon = str_replace_na(city, "Not in Oregon")) %>%
-     mutate(lives_in_oregon = if_else(lives_in_oregon == "Not in Oregon", "Not in Oregon", "Oregon")) %>%
-     group_by(lives_in_oregon, under_which_ford_family_program_did_you_receive_your_scholarship) %>%
-     count() %>%
-     group_by(under_which_ford_family_program_did_you_receive_your_scholarship) %>%
-     mutate(pct = round(prop.table(n), digits = 2)) %>%
-     ungroup() %>%
-     mutate(lives_in_oregon = fct_rev(lives_in_oregon)) %>%
-     ggplot(aes(x = "", 
-                y = pct,
-                fill = factor(lives_in_oregon))) +
-     geom_bar(stat = "identity",
-              width = 1) +
-     geom_text(aes(label = percent(pct)),
-               position = position_stack(vjust = 0.5),
-               color = "white") +
-     coord_polar("y") +
-     theme_void() +
-     theme(legend.position = "bottom") +
-     labs(fill = "") +
-     facet_wrap(~under_which_ford_family_program_did_you_receive_your_scholarship) +
-     scale_fill_manual(values = c(tfff.dark.green, tfff.light.green))
-     
-
-```
-
-## Rural
-
-### Rural vs not rural by type of scholarship
-
-```{r}
-
-data %>%
-     select(tfff_classification, under_which_ford_family_program_did_you_receive_your_scholarship) %>%
-     filter(!is.na(tfff_classification)) %>%
-     group_by(tfff_classification, under_which_ford_family_program_did_you_receive_your_scholarship) %>%
-     count() %>%
-     ungroup() %>%
-     group_by(under_which_ford_family_program_did_you_receive_your_scholarship) %>%
-     mutate(pct = round(prop.table(n), digits = 2)) %>%
-     ungroup() %>%
-     ggplot(aes(x = "", 
-                y = pct,
-                fill = factor(tfff_classification))) +
-     geom_bar(stat = "identity",
-              width = 1) +
-     geom_text(aes(label = percent(pct)),
-               position = position_stack(vjust = 0.5),
-               color = "white") +
-     coord_polar("y") +
-     theme_void() +
-     theme(legend.position = "bottom") +
-     labs(fill = "") +
-     facet_wrap(~under_which_ford_family_program_did_you_receive_your_scholarship) +
-     scale_fill_manual(values = c(tfff.light.green, tfff.dark.green))
-```
 
 
 
 
 # Communications
 
-## Awareness of Ford Scholar Alumni Association
-
-### All respondents
-
-```{r}
+## Prior to receiving the email for this survey, were you aware of the existence of the Ford Scholar Alumni Association?
 
 
-data %>%
+```{r fig.height = 2}
+     
+
+  data %>%
      group_by(prior_to_receiving_the_email_for_this_survey_were_you_aware_of_the_existence_of_the_ford_scholar_alumni_association) %>%
      summarize(n = n()) %>%
      filter(!is.na(prior_to_receiving_the_email_for_this_survey_were_you_aware_of_the_existence_of_the_ford_scholar_alumni_association)) %>%
-     mutate(pct = round(prop.table(n), digits = 2)) %>%
-     set_names(c("item", "n", "pct")) %>%
-     dk_pie_chart() +
-     scale_fill_manual(values = rev(c(tfff.dark.green, tfff.light.green)))
+     ggplot(aes(x = prior_to_receiving_the_email_for_this_survey_were_you_aware_of_the_existence_of_the_ford_scholar_alumni_association, y = n)) +
+     geom_col(fill = tfff.dark.green) +
+               geom_text(aes(label = n),
+               hjust = -.5,
+               color = tfff.dark.green) +
+     coord_flip() +
+     scale_fill_manual(values = c(tfff.light.green, tfff.dark.green)) +
+     dk_theme +
+     theme(axis.title = element_blank()) +
+     scale_y_continuous(limits = c(0, 300))
+
+
+     
 
 
 ```
 
-### By whether they live in Oregon
+## Which communications from the alumni association do you currently receive?
 
-```{r}
-data %>%
-     group_by(prior_to_receiving_the_email_for_this_survey_were_you_aware_of_the_existence_of_the_ford_scholar_alumni_association, lives_in_oregon) %>%
-     summarize(n = n()) %>%
-     filter(!is.na(prior_to_receiving_the_email_for_this_survey_were_you_aware_of_the_existence_of_the_ford_scholar_alumni_association)) %>%
-     group_by(lives_in_oregon) %>%
-     mutate(pct = round(prop.table(n), digits = 2)) %>%
-     set_names(c("item", "lives_in_oregon", "n", "pct")) %>%
-     dk_pie_chart() +
-     scale_fill_manual(values = rev(c(tfff.dark.green, tfff.light.green))) +
-     facet_wrap(~lives_in_oregon)
-
-
-```
-
-
-### By scholarship type
-
-```{r}
-data %>%
-     group_by(prior_to_receiving_the_email_for_this_survey_were_you_aware_of_the_existence_of_the_ford_scholar_alumni_association, under_which_ford_family_program_did_you_receive_your_scholarship) %>%
-     summarize(n = n()) %>%
-     filter(!is.na(prior_to_receiving_the_email_for_this_survey_were_you_aware_of_the_existence_of_the_ford_scholar_alumni_association)) %>%
-     group_by(under_which_ford_family_program_did_you_receive_your_scholarship) %>%
-     mutate(pct = round(prop.table(n), digits = 2)) %>%
-     set_names(c("item", "scholarship", "n", "pct")) %>%
-     dk_pie_chart() +
-     scale_fill_manual(values = rev(c(tfff.dark.green, tfff.light.green))) +
-     facet_wrap(~scholarship)
-```
-
-
-## Communications they receive
-
-### All respondents
-
-```{r}
+```{r fig.height = 3}
 data %>%
      select(contains("which_communications")) %>%
      set_names(c("Quarterly e-newsletter",
@@ -474,76 +345,305 @@ data %>%
      mutate(pct = round(prop.table(n), digits = 2)) %>%
      ungroup() %>%
      mutate(item = factor(item, levels = rev(c("Quarterly e-newsletter",
-                 "Annual alumni magazine",
-                 "Emails",
-                 "Social media posts",
-                 "None")))) %>%
+                                               "Annual alumni magazine",
+                                               "Emails",
+                                               "Social media posts",
+                                               "None")))) %>%
      filter(response == "Yes") %>%
      ggplot(aes(x = item, y = pct)) +
      geom_col(fill = tfff.dark.green) +
-          geom_text(aes(label = percent(pct)),
+     geom_text(aes(label = percent(pct)),
                hjust = -.35,
                color = tfff.dark.green) +
      coord_flip() +
-     theme_minimal() +
+     dk_theme +
      theme(axis.title = element_blank()) +
      scale_y_continuous(labels = percent,
                         limits = c(0, 1))
-  
-     
+
+
 ```
 
-### By whether they live in Oregon
 
-```{r}
+## How helpful are the following methods of the FSAA's communications?
+
+```{r fig.height = 11}
 data %>%
-     select(contains("which_communications"), lives_in_oregon) %>%
+     select(contains("how_helpful")) %>%
      set_names(c("Quarterly e-newsletter",
                  "Annual alumni magazine",
                  "Emails",
-                 "Social media posts",
-                 "None",
-                 "lives_in_oregon")) %>%
-     gather(key = "item", value = "response", -lives_in_oregon) %>%
-     mutate(response = str_replace_na(response, "No")) %>%
-     mutate(response = ifelse(response == "No", "No", "Yes")) %>%
-     group_by(item, lives_in_oregon) %>%
-     count(response) %>%
+                 "Social media posts")) %>%
+     gather(key = "item", value = "response") %>%
+     group_by(item, response) %>%
+     summarize(n = n()) %>%
+     filter(!is.na(response)) %>%
      mutate(pct = round(prop.table(n), digits = 2)) %>%
-     ungroup() %>%
-     mutate(item = factor(item, levels = rev(c("Quarterly e-newsletter",
-                 "Annual alumni magazine",
-                 "Emails",
-                 "Social media posts",
-                 "None")))) %>%
-     filter(response == "Yes") %>%
-     ggplot(aes(x = item, y = pct)) +
+     mutate(response = factor(response, levels = c("Not at all helpful",
+                                                   "Somewhat unhelpful",
+                                                   "Neutral",
+                                                   "Somewhat helpful",
+                                                   "Very helpful"))) %>%
+     filter(!is.na(response)) %>%
+     ggplot(aes(x = response, y = pct)) +
      geom_col(fill = tfff.dark.green) +
           geom_text(aes(label = percent(pct)),
-               hjust = -.35,
+               vjust = -.35,
                color = tfff.dark.green) +
-     coord_flip() +
-     theme_minimal() +
-     theme(axis.title = element_blank()) +
+     dk_theme +
+     theme(axis.title = element_blank(),
+           legend.position = "none") +
+     labs(fill = "") +
+     facet_wrap(~item, ncol = 1,
+                scale = "free_x") +
      scale_y_continuous(labels = percent,
-                        limits = c(0, 1)) +
-     facet_wrap(~lives_in_oregon)
-  
+                        limits = c(0, .6))
 ```
 
+
+##  Rank the type of information you would like to see in alumni association communications, where 1 is the information you would most like to see and 6 is is the information you would least like to see.
+
+```{r fig.height = 16}
+data %>%
+     select(contains("info_you_want_to_see")) %>%
+     set_names(c("Event information",
+                 "Community service opportunities",
+                 "Ford Family Foundation notes",
+                 "Alumni profiles",
+                 "Information about current scholars",
+                 "Professional development tips")) %>%
+     gather(key = "item", value = "response") %>%
+     group_by(item, response) %>%
+     summarize(n = n()) %>%
+     mutate(pct = round(prop.table(n), digits = 2)) %>%
+     filter(!is.na(response)) %>%
+     mutate(response = as.character(response)) %>%
+     mutate(response = fct_inorder(response)) %>%
+     ggplot(aes(x = response, 
+                y = pct)) +
+     geom_bar(stat = "identity", fill = tfff.dark.green) +
+     geom_text(aes(label = percent(pct)),
+               vjust = -.35,
+               color = tfff.dark.green) +
+     dk_theme +
+     theme(legend.position = "none",
+           axis.title = element_blank()) +
+     facet_wrap(~item, ncol = 1,
+                scale = "free_x") +
+     scale_y_continuous(labels = percent,
+                        limits = c(0, .5))
+```
 
 
 # Engagement
 
-# Familiarity with TFFF
 
-```{r eval = FALSE, echo = FALSE, include = FALSE}
 
-gitbook(split_by = "section+number", 
-        number_sections = TRUE)
+## How likely would you be to participate in the following types of opportunities if they were available? 
 
-render_book("ford_scholar_alumni_survey.Rmd", 
-            "bookdown::gitbook", 
-            output_dir = "report")
+```{r fig.height=16}
+
+data %>%
+     select(contains("how_likely_would_you_be_to_participate_in_the_following_types_of_opportunities")) %>%
+          set_names(c("Scholarship outreach at high schools or community colleges",
+"Mentoring current scholars or alumni",
+"Local community service projects",
+"A regional alumni association event",
+"Alumni association committee or board service",
+"Professional leadership development training for alumni",
+"Connect with alumni through private online portal for professional networking")) %>%
+     gather(key = "item", value = "response") %>%
+     group_by(item, response) %>%
+     summarize(n = n()) %>%
+     mutate(pct = round(prop.table(n), digits = 2)) %>%
+     filter(!is.na(response)) %>%
+     mutate(response = factor(response, levels = c("Very unlikely",
+                                                   "Unlikely",
+                                                   "Neutral",
+                                                   "Likely",
+                                                   "Very likely"))) %>%
+     ggplot(aes(x = response, 
+                y = pct)) +
+     geom_bar(stat = "identity", fill = tfff.dark.green) +
+     geom_text(aes(label = percent(pct)),
+               vjust = -.35,
+               color = tfff.dark.green) +
+     dk_theme +
+     theme(axis.title = element_blank()) +
+     facet_wrap(~item, ncol = 1,
+                scale = "free_x") +
+     scale_y_continuous(labels = percent,
+                        limits = c(0, .5))
 
 ```
+
+
+
+## Rank from most important to least, from your perspective, the following reasons for engaging with the alumni association.
+
+```{r fig.height = 13}
+data %>%
+     select(contains("reasons_for_engaging")) %>%
+     select(-reasons_for_engaging_with_alumni_assocation_is_there_anything_not_listed_in_question_13_that_would_motivate_you_to_participate_in_alumni_activities) %>%
+     set_names(c("Professional networking",
+                 "Community service",
+                 "Building community",
+                 "Leadership development",
+                 "Connection to and support of TFFF")) %>%
+     gather(key = "item", value = "response") %>%
+     group_by(item, response) %>%
+     summarize(n = n()) %>%
+     mutate(pct = round(prop.table(n), digits = 2)) %>%
+     filter(!is.na(response)) %>%
+     mutate(response = as.character(response)) %>%
+     mutate(response = fct_inorder(response)) %>%
+     ggplot(aes(x = response, 
+                y = pct)) +
+     geom_bar(stat = "identity", fill = tfff.dark.green) +
+     geom_text(aes(label = percent(pct)),
+               vjust = -.35,
+               color = tfff.dark.green) +
+     dk_theme +
+     theme(legend.position = "none",
+           axis.title = element_blank()) +
+     facet_wrap(~item, ncol = 1,
+                scale = "free_x") +
+     scale_y_continuous(labels = percent,
+                        limits = c(0, .5))
+```
+
+
+## Have you participated in past alumni association events?
+
+```{r fig.height = 4}
+data %>%
+     select(contains("have_you_participated")) %>%
+     set_names(c("1-2 events",
+                 "3+ events",
+                 "Board/committee service",
+                 "Never attended")) %>%
+     gather(key = "item", value = "response") %>%
+     mutate(response = if_else(is.na(response), 
+                               "No",
+                               "Yes")) %>%
+     group_by(item, response) %>%
+     summarize(n = n()) %>%
+     mutate(pct = round(prop.table(n), digits = 2)) %>%
+          filter(response == "Yes") %>%
+     ggplot(aes(x = response, y = pct)) +
+     geom_col(fill = tfff.dark.green) +
+     geom_text(aes(label = percent(pct)),
+               hjust = -.35,
+               color = tfff.dark.green) +
+     coord_flip() +
+     theme_minimal() +
+     theme(strip.text = element_text(size = 13, face = "bold"),
+           panel.spacing = unit(1, "lines")) +
+     theme(axis.title = element_blank(),
+           axis.text.y = element_blank()) +
+     facet_wrap(~item, ncol = 1) +
+     scale_y_continuous(limits = c(0, 1),
+                        labels = percent)
+     
+
+
+```
+
+# The Ford Family Foundation
+
+## How interested are you in engaging with the alumni association?
+
+```{r}
+data %>%
+     select(how_interested_are_you_in_engaging_with_the_alumni_association) %>%
+     gather(key = "item", value = "response") %>%
+     group_by(item, response) %>%
+     summarize(n = n()) %>%
+     filter(!is.na(response)) %>%
+     mutate(pct = round(prop.table(n), digits = 2)) %>%
+     mutate(response = c("Somewhat not interested",
+                                                   "Neutral",
+                                                   "Somewhat interested",
+                                                   "Very interested")) %>%
+     mutate(response = factor(response, 
+                              levels = c("Somewhat not interested",
+                                                   "Neutral",
+                                                   "Somewhat interested",
+                                                   "Very interested"))) %>%
+     ggplot(aes(x = response, y = pct)) +
+     geom_col(fill = tfff.dark.green) +
+          geom_text(aes(label = percent(pct)),
+               vjust = -.35,
+               color = tfff.dark.green) +
+     dk_theme +
+     theme(axis.title = element_blank(),
+           legend.position = "none") +
+     scale_y_continuous(labels = percent,
+                        limits = c(0, .6))
+```
+
+## How interested are you in being engaged with The Ford Family Foundation?
+```{r}
+data %>%
+     select(how_interested_are_you_in_being_engaged_with_the_ford_family_foundation) %>%
+     gather(key = "item", value = "response") %>%
+     group_by(item, response) %>%
+     summarize(n = n()) %>%
+     filter(!is.na(response)) %>%
+     mutate(pct = round(prop.table(n), digits = 2)) %>%
+     mutate(response = c("Somewhat not interested",
+                                                   "Neutral",
+                                                   "Somewhat interested",
+                                                   "Very interested")) %>%
+     mutate(response = factor(response, 
+                              levels = c("Somewhat not interested",
+                                                   "Neutral",
+                                                   "Somewhat interested",
+                                                   "Very interested"))) %>%
+     ggplot(aes(x = response, y = pct)) +
+     geom_col(fill = tfff.dark.green) +
+          geom_text(aes(label = percent(pct)),
+               vjust = -.35,
+               color = tfff.dark.green) +
+     dk_theme +
+     theme(axis.title = element_blank(),
+           legend.position = "none") +
+     scale_y_continuous(labels = percent,
+                        limits = c(0, .6))
+```
+
+## How aware are you about the work of the departments at The Ford Family Foundation?
+
+```{r fig.height = 10}
+data %>%
+     select(contains("how_aware_are_you_about")) %>%
+     set_names(c("FICB",
+                 "Community Economic Development",
+                 "Children, Youth, and Families",
+                 "Postsecondary Success",
+                 "Visual Arts")) %>%
+     gather(key = "item", value = "response") %>%
+     group_by(item, response) %>%
+     summarize(n = n()) %>%
+     filter(!is.na(response)) %>%
+     mutate(pct = round(prop.table(n), digits = 2)) %>%
+     mutate(response = factor(response, levels = c("No awareness",
+                                                   "I've heard of it",
+                                                   "Fairly aware",
+                                                   "I know this work well"))) %>%
+     filter(!is.na(response)) %>%
+     ggplot(aes(x = response, y = pct)) +
+     geom_col(fill = tfff.dark.green) +
+          geom_text(aes(label = percent(pct)),
+               vjust = -.35,
+               color = tfff.dark.green) +
+     dk_theme +
+     theme(axis.title = element_blank(),
+           legend.position = "none") +
+     labs(fill = "") +
+     facet_wrap(~item, ncol = 1,
+                scale = "free_x") +
+     scale_y_continuous(labels = percent,
+                        limits = c(0, .6))
+```
+
