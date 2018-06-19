@@ -21,7 +21,7 @@ data <- read_excel("data/alumni_survey.xlsx") %>%
                                      "Lives outside Oregon",
                                      "Lives in Oregon")) %>%
      mutate(lives_in_oregon = factor(lives_in_oregon, levels = rev(c("Lives in Oregon",
-                                                                 "Lives outside Oregon")))) %>%
+                                                                     "Lives outside Oregon")))) %>%
      mutate(years_since_grad = 2018 - what_year_did_you_graduate_from_college) %>%
      mutate(years_since_grad_grouped = case_when(
           years_since_grad < 2 ~ "0-2 years",
@@ -69,6 +69,16 @@ data <- read_excel("data/alumni_survey.xlsx") %>%
                                            "No info")))
 
 
+
+
+tfff_groups <- c("lives_in_oregon",
+                 "rural_or_not",
+                 "years_since_grad_grouped",
+                 "highest_level_of_education_completed_or_in_progress",
+                 "age_groups",
+                 "under_which_ford_family_program_did_you_receive_your_scholarship")
+
+
 # Theme -------------------------------------------------------------------
 
 tfff.dark.green <- "#265142"
@@ -85,3 +95,6 @@ tfff.light.gray <- "#eeeeee"
 dk_theme <- theme_minimal() +
      theme(strip.text = element_text(size = 13, face = "bold"),
            panel.spacing = unit(3, "lines"))
+
+
+

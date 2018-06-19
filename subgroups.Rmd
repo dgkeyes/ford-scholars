@@ -1,0 +1,1502 @@
+---
+title: "Ford scholars alumni survey"
+output:
+  html_document:
+    css: style.css
+---
+
+```{r include=FALSE}
+
+knitr::opts_chunk$set(echo = FALSE, 
+                      warning = FALSE,
+                      message = FALSE,
+                      fig.width = 8)
+
+library(readxl)
+library(tidyverse)
+library(janitor)
+library(googlesheets)
+library(leaflet)
+library(scales)
+library(ggiraph)
+library(bookdown)
+library(skimr)
+library(friendlyeval)
+library(rlang)
+
+source("data_functions_themes.R")
+
+```
+
+
+# Demographics
+
+In total, there were 314 respondents.
+
+## Type of scholarship
+```{r fig.height = 3}
+
+data %>%
+     group_by(under_which_ford_family_program_did_you_receive_your_scholarship) %>%
+     summarize(n = n()) %>%
+     ggplot(aes(x = under_which_ford_family_program_did_you_receive_your_scholarship, y = n)) +
+     geom_col(fill = tfff.dark.green) +
+     geom_text(aes(label = n),
+               vjust = -.5,
+               color = tfff.dark.green) +
+     dk_theme +
+     theme(axis.title = element_blank()) +
+     scale_y_continuous(limits = c(0, 225))
+
+```
+
+## Where do respondents live?
+
+### All respondents
+
+Note: Respondents who listed the exact same zip codes are spread out slightly so they don't overlap. The dots do not show not exact locations of respondents.
+
+```{r fig.height = 6}
+
+
+
+data %>%
+     mutate(longitude = jitter(longitude, factor = 2)) %>%
+     mutate(latitude = jitter(latitude, factor = 2)) %>%
+     leaflet() %>%
+     addProviderTiles(providers$CartoDB.Positron) %>%
+     addCircleMarkers(
+          color = tfff.dark.green,
+          fillOpacity = .5,
+          popup = data$what_is_the_zip_code_for_your_current_residence
+     )
+
+
+
+```
+
+### Within Oregon vs outside Oregon
+
+
+```{r fig.height = 2}
+
+data %>%
+     group_by(lives_in_oregon) %>%
+     count() %>%
+     ungroup() %>%
+     mutate(pct = round(prop.table(n), digits = 2)) %>%
+     ungroup() %>%
+     ggplot(aes(x = lives_in_oregon, y = pct)) +
+     geom_col(fill = tfff.dark.green) +
+     geom_text(aes(label = percent(pct)),
+               hjust = -.5,
+               color = tfff.dark.green) +
+     coord_flip() +
+     dk_theme +
+     theme(axis.title = element_blank()) +
+     scale_y_continuous(limits = c(0, .9),
+                        labels = percent)
+
+
+```
+
+
+### By Oregon county
+
+This map shows the number of respondents per county (it only shows those who live in Oregon, obviously). Darker colors indicate higher numbers in a county. Hover over any county to see the exact number of respondents. 
+
+```{r}
+
+
+oregon_map <- map_data("county", "oregon")
+
+
+oregon_map <- data %>%
+     select(county) %>%
+     group_by(county) %>%
+     count() %>%
+     ungroup() %>%
+     mutate(county = str_to_lower(county)) %>%
+     right_join(oregon_map, by = c("county" = "subregion")) %>%
+     mutate(n = str_replace_na(n, "0")) %>%
+     mutate(n = as.numeric(n))
+
+
+m <- ggplot(oregon_map, 
+            aes(x = long, 
+                y = lat, 
+                group = group,
+                alpha = factor(n))) +
+     geom_polygon_interactive(
+          aes(tooltip = paste(str_to_title(county), 
+                              " County\n",
+                              n, 
+                              " respondent(s)",
+                              sep = "")),
+          fill = tfff.dark.green,
+          color = tfff.medium.gray) +
+     coord_map() +
+     theme_void() +
+     theme(legend.position = "none")
+
+ggiraph(code = print(m))
+
+```
+
+### Rural
+
+```{r}
+
+data %>%
+     select(rural_or_not) %>%
+     group_by(rural_or_not) %>%
+     summarize(n = n()) %>%
+     ggplot(aes(x = rural_or_not, y = n)) +
+     geom_col(fill = tfff.dark.green) +
+     geom_text(aes(label = n),
+               vjust = -.5,
+               color = tfff.dark.green) +
+     dk_theme +
+     theme(axis.title = element_blank()) +
+     scale_y_continuous(limits = c(0, 175))
+
+
+```
+
+
+## Age
+
+### Age of all respondents
+
+```{r}
+data %>%
+     ggplot(aes(x = age)) +
+     geom_bar(fill = tfff.dark.green) +
+     dk_theme +
+     labs(x = "Age",
+          y = "Number of respondents") +
+     scale_x_continuous(breaks = pretty_breaks(n = 10))
+
+```
+
+### Age of all respondents, grouped by decade
+
+```{r}
+
+data %>%
+     filter(age_groups != "No info") %>%
+     group_by(age_groups) %>%
+     summarize(n = n()) %>%
+     ggplot(aes(x = age_groups, y = n)) +
+     geom_col(fill = tfff.dark.green) +
+     geom_text(aes(label = n),
+               vjust = -.5,
+               color = tfff.dark.green) +
+     dk_theme +
+     labs(x = "Age",
+          y = "Number of respondents") +
+     scale_y_continuous(limits = c(0, 125))
+
+```
+
+
+
+## Education
+
+### Year respondents graduated from college
+
+Note that some people were confused by whether to count their undergrad or higher levels. I only included answers that were clearly for undregrad.
+
+```{r}
+data %>%
+     ggplot(aes(x = what_year_did_you_graduate_from_college)) +
+     geom_bar(fill = tfff.dark.green) +
+     dk_theme +
+     theme(axis.title  = element_blank()) +
+     scale_x_continuous(breaks = pretty_breaks(n = 10))
+```
+
+
+### Years since graduation
+The following graph shows the same data, but put into groups.
+```{r}
+
+data %>%
+     group_by(years_since_grad_grouped) %>%
+     count() %>%
+     ungroup() %>%
+     ggplot(aes(x = years_since_grad_grouped, 
+                y = n)) +
+     geom_col(fill = tfff.dark.green) +
+     geom_text(aes(label = n),
+               vjust = -.5,
+               color = tfff.dark.green) +
+     dk_theme +
+     scale_y_continuous(limits = c(0, 150)) +
+     theme(axis.title = element_blank())
+
+
+```
+
+
+### Highest level of education
+
+```{r}
+data %>%
+     group_by(highest_level_of_education_completed_or_in_progress) %>%
+     count() %>%
+     filter(highest_level_of_education_completed_or_in_progress != "Other (please specify)") %>%
+     ungroup() %>%
+     ggplot(aes(x = highest_level_of_education_completed_or_in_progress, 
+                y = n)) +
+     geom_col(fill = tfff.dark.green) +
+     geom_text(aes(label = n),
+               vjust = -.5,
+               color = tfff.dark.green) +
+     dk_theme +
+     scale_y_continuous(limits = c(0, 175)) +
+     theme(axis.title = element_blank())
+```
+
+
+
+
+## Work
+
+Principal industry (does not include those who said NA or listed other as their response).
+
+```{r dk_work_functions}
+dk_summarize_work_single <- function() { 
+     
+     data %>%
+          select(which_of_the_following_best_describes_the_principal_industry_in_which_you_work) %>%
+          group_by(which_of_the_following_best_describes_the_principal_industry_in_which_you_work) %>%
+          summarize(n = n()) %>%
+          set_names(c("item", "n")) %>%
+          na.omit() %>%
+          mutate(group = "All respondents")
+     
+     
+}
+
+
+
+dk_summarize_work_multiple <- function(group_col) { 
+     
+     data %>%
+          select(which_of_the_following_best_describes_the_principal_industry_in_which_you_work,
+                 !!rlang::ensym(group_col)) %>%
+          group_by(which_of_the_following_best_describes_the_principal_industry_in_which_you_work,
+                   !!rlang::ensym(group_col)) %>%
+          summarize(n = n()) %>%
+          set_names(c("item", "group", "n")) %>%
+          na.omit()
+     
+     
+}
+
+dk_plot_work <- function(.data) {
+     ggplot(.data, aes(x = item,
+                       y = n)) +
+          geom_col(fill = tfff.dark.green) +
+          geom_text(aes(label = n),
+                    hjust = -.5,
+                    color = tfff.dark.green) +
+          coord_flip() +
+          dk_theme +
+          scale_y_continuous(limits = c(0,90)) +
+          theme(axis.title = element_blank()) +
+          facet_wrap(~group,
+                     ncol = 2)
+}
+
+
+```
+
+
+```{r fig.height = 8}
+dk_summarize_work_single() %>%
+     dk_plot_work()
+```
+
+```{r}
+dk_height <- 8
+```
+
+
+
+
+
+
+
+
+
+# Communications
+
+## Prior to receiving the email for this survey, were you aware of the existence of the Ford Scholar Alumni Association?
+
+```{r}
+dk_summarize_awareness_single <- function() {
+     
+     data %>%
+          select(prior_to_receiving_the_email_for_this_survey_were_you_aware_of_the_existence_of_the_ford_scholar_alumni_association) %>%
+          group_by(prior_to_receiving_the_email_for_this_survey_were_you_aware_of_the_existence_of_the_ford_scholar_alumni_association) %>%
+          summarize(n = n()) %>%
+          na.omit() %>%
+          mutate(pct = round(prop.table(n), 2)) %>%
+          ungroup() %>%
+          set_names(c("response", "n", "pct")) %>%
+          filter(response == "Yes") %>%
+          mutate(group = "All respondents")
+}                  
+
+dk_plot_awareness <- function(.data) {
+     
+     ggplot(.data, aes(x = group,
+                       y = pct,
+                       fill = response)) + 
+          geom_bar(stat = "identity",
+                   fill = tfff.dark.green,
+                   position = position_stack(reverse = TRUE)) +
+          coord_flip() +
+          geom_text(aes(label = percent(pct)),
+                    nudge_y = .05,
+                    color = tfff.dark.green,
+                    fontface = "bold") +
+          dk_theme +
+          labs(fill = "") +
+          scale_y_continuous(limits = c(0, 1.15)) +
+          theme(axis.title = element_blank())
+}
+
+
+
+
+dk_summarize_awareness_multiple <- function(group_col) {
+     
+     data %>%
+          select(prior_to_receiving_the_email_for_this_survey_were_you_aware_of_the_existence_of_the_ford_scholar_alumni_association,
+                   !!rlang::ensym(group_col)) %>%
+          group_by(prior_to_receiving_the_email_for_this_survey_were_you_aware_of_the_existence_of_the_ford_scholar_alumni_association,
+                 !!rlang::ensym(group_col)) %>%
+          summarize(n = n()) %>%
+          na.omit() %>%
+          mutate(pct = round(prop.table(n), 2)) %>%
+          ungroup() %>%
+          set_names(c("response", "group", "n", "pct")) %>%
+          filter(response == "Yes") 
+}
+
+
+```
+
+
+```{r fig.height = 1}
+dk_summarize_awareness_single() %>%
+     dk_plot_awareness()
+```
+
+
+```{r}
+dk_height <- 1
+```
+
+
+### By subgroup: Lives in Oregon
+
+```{r fig.width = 12, fig.height = dk_height * 3}
+dk_summarize_awareness_multiple(lives_in_oregon) %>%
+     dk_plot_awareness()
+
+```
+
+### By subgroup: Rural
+
+```{r fig.width = 12, fig.height = dk_height * 4}
+dk_summarize_awareness_multiple(rural_or_not) %>%
+     dk_plot_awareness()
+
+```
+
+
+### By subgroup: Years since graduation
+
+```{r fig.width = 12, fig.height = dk_height * 6}
+dk_summarize_awareness_multiple(years_since_grad_grouped) %>%
+     dk_plot_awareness()
+
+```
+
+
+### By subgroup: Highest level of education
+
+```{r fig.width = 12, fig.height = dk_height * 6}
+dk_summarize_awareness_multiple(highest_level_of_education_completed_or_in_progress) %>%
+     dk_plot_awareness()
+
+```
+
+
+### By subgroup: Age
+
+```{r fig.width = 12, fig.height = dk_height * 6}
+dk_summarize_awareness_multiple(age_groups) %>%
+     dk_plot_awareness()
+
+```
+
+
+### By subgroup: Scholarship type
+
+```{r fig.width = 12, fig.height = dk_height * 4}
+dk_summarize_awareness_multiple(under_which_ford_family_program_did_you_receive_your_scholarship) %>%
+     dk_plot_awareness()
+
+```
+
+
+
+## Which communications from the alumni association do you currently receive?
+
+```{r}
+dk_summarize_communications_single <- function() {
+     data %>%
+          select(contains("which_communications")) %>%
+          set_names(c("Quarterly e-newsletter",
+                      "Annual alumni magazine",
+                      "Emails",
+                      "Social media posts",
+                      "None")) %>%
+          gather(key = "item", value = "response") %>%
+          mutate(response = str_replace_na(response, "No")) %>%
+          mutate(response = ifelse(response == "No", "No", "Yes")) %>%
+          group_by(item, response) %>%
+          summarize(n = n()) %>%
+          mutate(pct = round(prop.table(n), digits = 2)) %>%
+          ungroup() %>%
+          mutate(item = factor(item, levels = rev(c("Quarterly e-newsletter",
+                                                    "Annual alumni magazine",
+                                                    "Emails",
+                                                    "Social media posts",
+                                                    "None")))) %>%
+          filter(response == "Yes") %>%
+          mutate(group = "All respondents")
+     
+     
+     
+}
+
+
+
+
+
+dk_summarize_communications_multiple <- function(group_col) {
+     data %>%
+          select(contains("which_communications"),
+                 !!rlang::ensym(group_col)) %>%
+          set_names(c("Quarterly e-newsletter",
+                      "Annual alumni magazine",
+                      "Emails",
+                      "Social media posts",
+                      "None",
+                      "group")) %>%
+          gather(key = "item", value = "response", -group) %>%
+          mutate(response = str_replace_na(response, "No")) %>%
+          mutate(response = ifelse(response == "No", "No", "Yes")) %>%
+          group_by(item, group) %>%
+          count(response) %>%
+          mutate(pct = round(prop.table(n), digits = 2)) %>%
+          ungroup() %>%
+          mutate(item = factor(item, levels = rev(c("Quarterly e-newsletter",
+                                                    "Annual alumni magazine",
+                                                    "Emails",
+                                                    "Social media posts",
+                                                    "None")))) %>%
+          filter(response == "Yes")
+     
+     
+     
+}
+
+
+dk_plot_communications <- function(.data) {
+     
+     .data %>%
+          ggplot(aes(x = item, y = pct)) +
+          geom_col(fill = tfff.dark.green) +
+          geom_text(aes(label = percent(pct)),
+                    hjust = -.35,
+                    color = tfff.dark.green) +
+          coord_flip() +
+          dk_theme +
+          theme(axis.title = element_blank()) +
+          scale_y_continuous(labels = percent,
+                             limits = c(0, 1.1)) +
+          facet_wrap(~group, ncol = 2) +
+          theme(panel.grid.minor = element_blank())
+     
+}
+
+
+```
+
+
+```{r fig.height=2.5}
+dk_summarize_communications_single() %>%
+     dk_plot_communications()
+
+```
+
+```{r}
+dk_height <- 2.5
+```
+
+
+### By subgroup: Lives in Oregon
+
+```{r fig.width = 12, fig.height = dk_height * 3}
+dk_summarize_communications_multiple(lives_in_oregon) %>%
+     dk_plot_communications()
+
+```
+
+### By subgroup: Rural
+
+```{r fig.width = 12, fig.height = dk_height * 4}
+dk_summarize_communications_multiple(rural_or_not) %>%
+     dk_plot_communications()
+
+```
+
+
+### By subgroup: Years since graduation
+
+```{r fig.width = 12, fig.height = dk_height * 6}
+dk_summarize_communications_multiple(years_since_grad_grouped) %>%
+     dk_plot_communications()
+
+```
+
+
+### By subgroup: Highest level of education
+
+```{r fig.width = 12, fig.height = dk_height * 6}
+dk_summarize_communications_multiple(highest_level_of_education_completed_or_in_progress) %>%
+     dk_plot_communications()
+
+```
+
+
+### By subgroup: Age
+
+```{r fig.width = 12, fig.height = dk_height * 6}
+dk_summarize_communications_multiple(age_groups) %>%
+     dk_plot_communications()
+
+```
+
+
+### By subgroup: Scholarship type
+
+```{r fig.width = 12, fig.height = dk_height * 4}
+dk_summarize_communications_multiple(under_which_ford_family_program_did_you_receive_your_scholarship) %>%
+     dk_plot_communications()
+
+```
+
+
+##  Rank the type of information you would like to see in alumni association communications, where 1 is the information you would most like to see and 6 is is the information you would least like to see.
+
+The results below show the average rating for each item (this is different from how I presented it previously).
+
+```{r}
+dk_summarize_rank_communications_single <- function() {
+     
+     data %>%
+          select(contains("info_you_want_to_see")) %>%
+          set_names(c("Event information",
+                      "Community service opportunities",
+                      "Ford Family Foundation notes",
+                      "Alumni profiles",
+                      "Information about current scholars",
+                      "Professional development tips")) %>%
+          gather(key = "item", value = "response") %>%
+          group_by(item) %>%
+          summarize(avg = round(mean(response, na.rm = TRUE), 1)) %>%
+          mutate(group = "All respondents")
+     
+}
+
+
+
+
+
+dk_summarize_rank_communications_multiple <- function(group_col) {
+     
+     data %>%
+          select(contains("info_you_want_to_see"),
+                 !!rlang::ensym(group_col)) %>%
+          set_names(c("Event information",
+                      "Community service opportunities",
+                      "Ford Family Foundation notes",
+                      "Alumni profiles",
+                      "Information about current scholars",
+                      "Professional development tips",
+                      "group")) %>%
+          gather(key = "item", value = "response", -group) %>%
+          group_by(item, group) %>%
+          summarize(avg = round(mean(response, na.rm = TRUE), 1))
+     
+}
+
+dk_plot_rank_communications <- function(.data) {
+     
+     ggplot(.data, aes(x = item, 
+                       y = avg)) +
+          geom_col(fill = tfff.dark.green) +
+          geom_text(aes(label = avg),
+                    hjust = -.35,
+                    color = tfff.dark.green) +
+          coord_flip() +
+          dk_theme +
+          theme(axis.title = element_blank()) +
+          scale_y_continuous(limits = c(0, 6)) +
+          theme(panel.grid.minor = element_blank()) +
+          facet_wrap(~group, ncol = 2)
+}
+```
+
+```{r fig.height = 3}
+dk_summarize_rank_communications_single() %>%
+     dk_plot_rank_communications()
+
+```
+
+```{r}
+dk_height <- 3
+```
+
+### By subgroup: Lives in Oregon
+
+```{r fig.width = 12, fig.height = dk_height * 3}
+dk_summarize_rank_communications_multiple(lives_in_oregon) %>%
+     dk_plot_rank_communications()
+
+```
+
+### By subgroup: Rural
+
+```{r fig.width = 12, fig.height = dk_height * 4}
+dk_summarize_rank_communications_multiple(rural_or_not) %>%
+     dk_plot_rank_communications()
+
+```
+
+
+### By subgroup: Years since graduation
+
+```{r fig.width = 12, fig.height = dk_height * 6}
+dk_summarize_rank_communications_multiple(years_since_grad_grouped) %>%
+     dk_plot_rank_communications()
+
+```
+
+
+### By subgroup: Highest level of education
+
+```{r fig.width = 12, fig.height = dk_height * 6}
+dk_summarize_rank_communications_multiple(highest_level_of_education_completed_or_in_progress) %>%
+     dk_plot_rank_communications()
+
+```
+
+
+### By subgroup: Age
+
+```{r fig.width = 12, fig.height = dk_height * 6}
+dk_summarize_rank_communications_multiple(age_groups) %>%
+     dk_plot_rank_communications()
+
+```
+
+
+### By subgroup: Scholarship type
+
+```{r fig.width = 12, fig.height = dk_height * 4}
+dk_summarize_rank_communications_multiple(under_which_ford_family_program_did_you_receive_your_scholarship) %>%
+     dk_plot_rank_communications()
+
+```
+
+
+
+# Engagement
+
+
+
+## How likely would you be to participate in the following types of opportunities if they were available? 
+
+Note: The percentages shown are those who said they would be "likely" or "very likely" to particiapte in the opportunities. 
+
+```{r}
+dk_summarize_participate_opportunities_single <- function() {
+     data %>%
+          select(contains("how_likely_would_you_be_to_participate_in_the_following_types_of_opportunities")) %>%
+          set_names(c("Scholarship outreach at high schools or community colleges",
+                      "Mentoring current scholars or alumni",
+                      "Local community service projects",
+                      "A regional alumni association event",
+                      "Alumni association committee or board service",
+                      "Professional leadership development training for alumni",
+                      "Connect with alumni through private online portal for professional networking")) %>%
+          gather(key = "item", value = "response") %>%
+          mutate(response = ifelse(response == "Likely" |
+                                        response == "Very likely",
+                                   "Y", "N")) %>%
+          group_by(item, response) %>%
+          summarize(n = n()) %>%
+          mutate(pct = round(prop.table(n), 2)) %>%
+          filter(response == "Y") %>%
+          ungroup() %>%
+          mutate(item = str_wrap(item, 40)) %>%
+          mutate(group = "All respondents")
+     
+}     
+
+
+
+dk_summarize_participate_opportunities_multiple <- function(group_col) {
+     data %>%
+          select(contains("how_likely_would_you_be_to_participate_in_the_following_types_of_opportunities"),
+                 !!rlang::ensym(group_col)) %>%
+          set_names(c("Scholarship outreach at high schools or community colleges",
+                      "Mentoring current scholars or alumni",
+                      "Local community service projects",
+                      "A regional alumni association event",
+                      "Alumni association committee or board service",
+                      "Professional leadership development training for alumni",
+                      "Connect with alumni through private online portal for professional networking",
+                      "group")) %>%
+          gather(key = "item", value = "response", -group) %>%
+          mutate(response = ifelse(response == "Likely" |
+                                        response == "Very likely",
+                                   "Y", "N")) %>%
+          group_by(item, response, group) %>%
+          summarize(n = n()) %>%
+          mutate(pct = round(prop.table(n), 2)) %>%
+          filter(response == "Y") %>%
+          ungroup() %>%
+          mutate(item = str_wrap(item, 40))
+     
+}     
+
+
+
+
+
+dk_plot_participate_opportunities <- function(.data) {
+     
+     ggplot(.data, aes(x = item, 
+                       y = pct)) +
+          geom_col(fill = tfff.dark.green) +
+          geom_text(aes(label = percent(pct)),
+                    hjust = -.35,
+                    color = tfff.dark.green) +
+          coord_flip() +
+          dk_theme +
+          theme(axis.title = element_blank()) +
+          scale_y_continuous(labels = percent,
+                             limits = c(0, 1)) +
+          facet_wrap(~group, ncol = 2)
+}
+
+
+```
+
+
+```{r fig.height=3.25}
+dk_summarize_participate_opportunities_single() %>%
+     dk_plot_participate_opportunities
+```
+
+```{r}
+dk_height <- 3.25
+```
+
+### By subgroup: Lives in Oregon
+
+```{r fig.width = 12, fig.height = dk_height * 2}
+dk_summarize_participate_opportunities_multiple(lives_in_oregon) %>%
+     dk_plot_participate_opportunities()
+
+```
+
+### By subgroup: Rural
+
+```{r fig.width = 12, fig.height = dk_height * 4}
+dk_summarize_participate_opportunities_multiple(rural_or_not) %>%
+     dk_plot_participate_opportunities()
+
+```
+
+
+### By subgroup: Years since graduation
+
+```{r fig.width = 12, fig.height = dk_height * 6}
+dk_summarize_participate_opportunities_multiple(years_since_grad_grouped) %>%
+     dk_plot_participate_opportunities()
+
+```
+
+
+### By subgroup: Highest level of education
+
+```{r fig.width = 12, fig.height = dk_height * 6}
+dk_summarize_participate_opportunities_multiple(highest_level_of_education_completed_or_in_progress) %>%
+     dk_plot_participate_opportunities()
+
+```
+
+
+### By subgroup: Age
+
+```{r fig.width = 12, fig.height = dk_height * 6}
+dk_summarize_participate_opportunities_multiple(age_groups) %>%
+     dk_plot_participate_opportunities()
+
+```
+
+
+### By subgroup: Scholarship type
+
+```{r fig.width = 12, fig.height = dk_height * 4}
+dk_summarize_participate_opportunities_multiple(under_which_ford_family_program_did_you_receive_your_scholarship) %>%
+     dk_plot_participate_opportunities()
+
+```
+
+
+
+
+## Rank from most important to least, from your perspective, the following reasons for engaging with the alumni association.
+
+The results below show the average rating for each item (this is different from how I presented it previously).
+
+```{r}
+dk_summarize_reasons_for_engaging_single <- function() {
+     
+     data %>%
+          select(contains("reasons_for_engaging")) %>%
+          select(-reasons_for_engaging_with_alumni_assocation_is_there_anything_not_listed_in_question_13_that_would_motivate_you_to_participate_in_alumni_activities) %>%
+          set_names(c("Professional networking",
+                      "Community service",
+                      "Building community",
+                      "Leadership development",
+                      "Connection to and support of TFFF")) %>%
+          gather(key = "item", value = "response") %>%
+          group_by(item) %>%
+          summarize(avg = round(mean(response, na.rm = TRUE), 1)) %>%
+          mutate(group = "All respondents")
+     
+}
+
+
+
+
+
+
+
+dk_summarize_reasons_for_engaging_multiple <- function(group_col) {
+     
+     data %>%
+          select(contains("reasons_for_engaging"),
+                 !!rlang::ensym(group_col)) %>%
+          select(-reasons_for_engaging_with_alumni_assocation_is_there_anything_not_listed_in_question_13_that_would_motivate_you_to_participate_in_alumni_activities) %>%
+          set_names(c("Professional networking",
+                      "Community service",
+                      "Building community",
+                      "Leadership development",
+                      "Connection to and support of TFFF",
+                      "group")) %>%
+          gather(key = "item", value = "response", -group) %>%
+          group_by(item, group) %>%
+          summarize(avg = round(mean(response, na.rm = TRUE), 1))
+     
+}
+
+dk_plot_reasons_for_engaging <- function(.data) {
+     
+     ggplot(.data, aes(x = item, 
+                       y = avg)) +
+          geom_col(fill = tfff.dark.green) +
+          geom_text(aes(label = avg),
+                    hjust = -.35,
+                    color = tfff.dark.green) +
+          coord_flip() +
+          dk_theme +
+          theme(axis.title = element_blank()) +
+          scale_y_continuous(limits = c(0, 6),
+                             breaks = 1:6) +
+          theme(panel.grid.minor = element_blank()) +
+          facet_wrap(~group, ncol = 2)
+}
+```
+
+```{r fig.height = 2.5}
+
+dk_summarize_reasons_for_engaging_single() %>%
+     dk_plot_reasons_for_engaging
+```
+
+
+
+```{r}
+dk_height <- 2.5
+```
+
+### By subgroup: Lives in Oregon
+
+```{r fig.width = 12, fig.height = dk_height * 3}
+dk_summarize_reasons_for_engaging_multiple(lives_in_oregon) %>%
+     dk_plot_reasons_for_engaging()
+
+```
+
+### By subgroup: Rural
+
+```{r fig.width = 12, fig.height = dk_height * 4}
+dk_summarize_reasons_for_engaging_multiple(rural_or_not) %>%
+     dk_plot_reasons_for_engaging()
+
+```
+
+
+### By subgroup: Years since graduation
+
+```{r fig.width = 12, fig.height = dk_height * 6}
+dk_summarize_reasons_for_engaging_multiple(years_since_grad_grouped) %>%
+     dk_plot_reasons_for_engaging()
+
+```
+
+
+### By subgroup: Highest level of education
+
+```{r fig.width = 12, fig.height = dk_height * 6}
+dk_summarize_reasons_for_engaging_multiple(highest_level_of_education_completed_or_in_progress) %>%
+     dk_plot_reasons_for_engaging()
+
+```
+
+
+### By subgroup: Age
+
+```{r fig.width = 12, fig.height = dk_height * 6}
+dk_summarize_reasons_for_engaging_multiple(age_groups) %>%
+     dk_plot_reasons_for_engaging()
+
+```
+
+
+### By subgroup: Scholarship type
+
+```{r fig.width = 12, fig.height = dk_height * 4}
+dk_summarize_reasons_for_engaging_multiple(under_which_ford_family_program_did_you_receive_your_scholarship) %>%
+     dk_plot_reasons_for_engaging()
+
+```
+
+
+## Have you participated in past alumni association events?
+
+```{r}
+dk_summarize_participated_single <- function() {
+     data %>%
+          select(contains("have_you_participated")) %>%
+          set_names(c("1-2 events",
+                      "3+ events",
+                      "Board/committee service",
+                      "Never attended")) %>%
+          gather(key = "item", value = "response") %>%
+          mutate(response = if_else(is.na(response), 
+                                    "No",
+                                    "Yes")) %>%
+          group_by(item, response) %>%
+          summarize(n = n()) %>%
+          mutate(pct = round(prop.table(n), digits = 2)) %>%
+          filter(response == "Yes") %>%
+          mutate(group = "All respondents")
+}
+
+
+
+
+
+dk_summarize_participated_multiple <- function(group_col) {
+     data %>%
+          select(contains("have_you_participated"),
+                 !!rlang::ensym(group_col)) %>%
+          set_names(c("1-2 events",
+                      "3+ events",
+                      "Board/committee service",
+                      "Never attended",
+                      "group")) %>%
+          gather(key = "item", value = "response", -group) %>%
+          mutate(response = if_else(is.na(response), 
+                                    "No",
+                                    "Yes")) %>%
+          group_by(item, response, group) %>%
+          summarize(n = n()) %>%
+          mutate(pct = round(prop.table(n), digits = 2)) %>%
+          filter(response == "Yes") 
+}
+
+
+
+
+dk_plot_participated <- function(.data) {
+     ggplot(.data, 
+            aes(x = item, 
+                y = pct)) +
+          geom_col(fill = tfff.dark.green) +
+          geom_text(aes(label = percent(pct)),
+                    hjust = -.35,
+                    color = tfff.dark.green) +
+          coord_flip() +
+          dk_theme +
+          theme(axis.title = element_blank()) +
+          scale_y_continuous(limits = c(0, 1),
+                             labels = percent) +
+          facet_wrap(~group, ncol = 2)
+}
+
+
+```
+
+
+```{r fig.height = 2}
+dk_summarize_participated_single() %>%
+     dk_plot_participated
+```
+
+
+```{r}
+dk_height <- 2
+```
+
+### By subgroup: Lives in Oregon
+
+```{r fig.width = 12, fig.height = dk_height * 3}
+dk_summarize_participated_multiple(lives_in_oregon) %>%
+     dk_plot_participated()
+
+```
+
+### By subgroup: Rural
+
+```{r fig.width = 12, fig.height = dk_height * 4}
+dk_summarize_participated_multiple(rural_or_not) %>%
+     dk_plot_participated()
+
+```
+
+
+### By subgroup: Years since graduation
+
+```{r fig.width = 12, fig.height = dk_height * 6}
+dk_summarize_participated_multiple(years_since_grad_grouped) %>%
+     dk_plot_participated()
+
+```
+
+
+### By subgroup: Highest level of education
+
+```{r fig.width = 12, fig.height = dk_height * 6}
+dk_summarize_participated_multiple(highest_level_of_education_completed_or_in_progress) %>%
+     dk_plot_participated()
+
+```
+
+
+### By subgroup: Age
+
+```{r fig.width = 12, fig.height = dk_height * 6}
+dk_summarize_participated_multiple(age_groups) %>%
+     dk_plot_participated()
+
+```
+
+
+### By subgroup: Scholarship type
+
+```{r fig.width = 12, fig.height = dk_height * 4}
+dk_summarize_participated_multiple(under_which_ford_family_program_did_you_receive_your_scholarship) %>%
+     dk_plot_participated()
+
+```
+
+# The Ford Family Foundation
+
+## How interested are you in engaging with the alumni association?
+
+```{r}
+dk_summarize_engaging_alum_single <- function() {
+     data %>%
+          select(how_interested_are_you_in_engaging_with_the_alumni_association) %>%
+          gather(key = "item", value = "response") %>%
+          mutate(response = ifelse(response == "Somewhat interested" |
+                                        response == "Very interested",
+                                   "Y", "N")) %>%
+          group_by(item, response) %>%
+          summarize(n = n()) %>%
+          mutate(pct = round(prop.table(n), 2)) %>%
+          filter(response == "Y") %>%
+          mutate(group = "All respondents") 
+}
+
+dk_summarize_engaging_alum_multiple <- function(group_col) {
+     data %>%
+          select(how_interested_are_you_in_engaging_with_the_alumni_association,
+                 !!rlang::ensym(group_col)) %>%
+          set_names(c("item", "group")) %>%
+          gather(key = "item", value = "response", -group) %>%
+          mutate(response = ifelse(response == "Somewhat interested" |
+                                        response == "Very interested",
+                                   "Y", "N")) %>%
+          group_by(group, response) %>%
+          summarize(n = n()) %>%
+          mutate(pct = round(prop.table(n), 2)) %>%
+          filter(!is.na(response)) %>%
+          filter(response == "Y")
+}
+
+
+dk_plot_engaging_alum <- function(.data) {
+     
+     ggplot(.data, aes(x = group, 
+                       y = pct)) +
+          geom_col(fill = tfff.dark.green) +
+          geom_text(aes(label = percent(pct)),
+                    hjust = -.35,
+                    color = tfff.dark.green) +
+          coord_flip() +
+          dk_theme +
+          theme(axis.title = element_blank()) +
+          scale_y_continuous(labels = percent,
+                             limits = c(0, 1)) 
+}
+```
+
+```{r fig.height = 1}
+dk_summarize_engaging_alum_single() %>%
+     dk_plot_engaging_alum()
+```
+
+```{r}
+dk_height <- 1
+```
+
+### By subgroup: Lives in Oregon
+
+```{r fig.width = 12, fig.height = dk_height * 3}
+dk_summarize_engaging_alum_multiple(lives_in_oregon) %>%
+     dk_plot_engaging_alum()
+
+```
+
+### By subgroup: Rural
+
+```{r fig.width = 12, fig.height = dk_height * 4}
+dk_summarize_engaging_alum_multiple(rural_or_not) %>%
+     dk_plot_engaging_alum()
+
+```
+
+
+### By subgroup: Years since graduation
+
+```{r fig.width = 12, fig.height = dk_height * 6}
+dk_summarize_engaging_alum_multiple(years_since_grad_grouped) %>%
+     dk_plot_engaging_alum()
+
+```
+
+
+### By subgroup: Highest level of education
+
+```{r fig.width = 12, fig.height = dk_height * 6}
+dk_summarize_engaging_alum_multiple(highest_level_of_education_completed_or_in_progress) %>%
+     dk_plot_engaging_alum()
+
+```
+
+
+### By subgroup: Age
+
+```{r fig.width = 12, fig.height = dk_height * 6}
+dk_summarize_engaging_alum_multiple(age_groups) %>%
+     dk_plot_engaging_alum()
+
+```
+
+
+### By subgroup: Scholarship type
+
+```{r fig.width = 12, fig.height = dk_height * 4}
+dk_summarize_engaging_alum_multiple(under_which_ford_family_program_did_you_receive_your_scholarship) %>%
+     dk_plot_engaging_alum()
+
+```
+
+
+
+
+
+## How interested are you in being engaged with The Ford Family Foundation?
+```{r}
+dk_summarize_engaging_tfff_single <- function() {
+     data %>%
+          select(how_interested_are_you_in_being_engaged_with_the_ford_family_foundation) %>%
+          gather(key = "item", value = "response") %>%
+          mutate(response = ifelse(response == "Somewhat interested" |
+                                        response == "Very interested",
+                                   "Y", "N")) %>%
+          group_by(item, response) %>%
+          summarize(n = n()) %>%
+          mutate(pct = round(prop.table(n), 2)) %>%
+          filter(response == "Y") %>%
+          mutate(group = "All respondents") 
+}
+
+dk_summarize_engaging_tfff_multiple <- function(group_col) {
+     data %>%
+          select(how_interested_are_you_in_being_engaged_with_the_ford_family_foundation,
+                 !!rlang::ensym(group_col)) %>%
+          set_names(c("item", "group")) %>%
+          gather(key = "item", value = "response", -group) %>%
+          mutate(response = ifelse(response == "Somewhat interested" |
+                                        response == "Very interested",
+                                   "Y", "N")) %>%
+          group_by(group, response) %>%
+          summarize(n = n()) %>%
+          mutate(pct = round(prop.table(n), 2)) %>%
+          filter(!is.na(response)) %>%
+          filter(response == "Y")
+}
+
+
+
+dk_plot_engaging_tfff <- function(.data) {
+     
+     ggplot(.data, aes(x = group, 
+                       y = pct)) +
+          geom_col(fill = tfff.dark.green) +
+          geom_text(aes(label = percent(pct)),
+                    hjust = -.35,
+                    color = tfff.dark.green) +
+          coord_flip() +
+          dk_theme +
+          theme(axis.title = element_blank()) +
+          scale_y_continuous(labels = percent,
+                             limits = c(0, 1)) 
+}
+```
+
+```{r fig.height=1}
+dk_summarize_engaging_tfff_single() %>%
+     dk_plot_engaging_tfff()
+```
+
+```{r}
+dk_height <- 1
+```
+
+### By subgroup: Lives in Oregon
+
+```{r fig.width = 12, fig.height = dk_height * 3}
+dk_summarize_engaging_tfff_multiple(lives_in_oregon) %>%
+     dk_plot_engaging_tfff()
+
+```
+
+### By subgroup: Rural
+
+```{r fig.width = 12, fig.height = dk_height * 4}
+dk_summarize_engaging_tfff_multiple(rural_or_not) %>%
+     dk_plot_engaging_tfff()
+
+```
+
+
+### By subgroup: Years since graduation
+
+```{r fig.width = 12, fig.height = dk_height * 6}
+dk_summarize_engaging_tfff_multiple(years_since_grad_grouped) %>%
+     dk_plot_engaging_tfff()
+
+```
+
+
+### By subgroup: Highest level of education
+
+```{r fig.width = 12, fig.height = dk_height * 6}
+dk_summarize_engaging_tfff_multiple(highest_level_of_education_completed_or_in_progress) %>%
+     dk_plot_engaging_tfff()
+
+```
+
+
+### By subgroup: Age
+
+```{r fig.width = 12, fig.height = dk_height * 6}
+dk_summarize_engaging_tfff_multiple(age_groups) %>%
+     dk_plot_engaging_tfff()
+
+```
+
+
+### By subgroup: Scholarship type
+
+```{r fig.width = 12, fig.height = dk_height * 4}
+dk_summarize_engaging_tfff_multiple(under_which_ford_family_program_did_you_receive_your_scholarship) %>%
+     dk_plot_engaging_tfff()
+
+```
+
+
+
+## How aware are you about the work of the departments at The Ford Family Foundation?
+
+Note: The percentage shown are those who said they are "fairly aware" or "know this work well" for each department.
+
+```{r}
+
+
+dk_summarize_awareness_depts_single <- function() {
+     
+     data %>%
+          select(contains("how_aware_are_you_about")) %>%
+          set_names(c("FICB",
+                      "Community Economic Development",
+                      "Children, Youth, and Families",
+                      "Postsecondary Success",
+                      "Visual Arts")) %>%
+          gather(key = "item", value = "response") %>%
+          mutate(response = ifelse(response == "Fairly aware" |
+                                        response == "I know this work well",
+                                   "Y", "N")) %>%
+          group_by(item, response) %>%
+          summarize(n = n()) %>%
+          mutate(pct = round(prop.table(n), 2)) %>%
+          filter(!is.na(response)) %>%
+          filter(response == "Y") %>%
+          mutate(group = "All respondents")
+     
+}
+
+dk_summarize_awareness_depts_multiple <- function(group_col) {
+     
+     data %>%
+          select(contains("how_aware_are_you_about"),
+                 !!rlang::ensym(group_col)) %>%
+          set_names(c("FICB",
+                      "Community Economic Development",
+                      "Children, Youth, and Families",
+                      "Postsecondary Success",
+                      "Visual Arts",
+                      "group")) %>%
+          gather(key = "item", value = "response", -group) %>%
+          mutate(response = ifelse(response == "Fairly aware" |
+                                        response == "I know this work well",
+                                   "Y", "N")) %>%
+          group_by(response, group, item) %>%
+          summarize(n = n()) %>%
+          mutate(pct = round(prop.table(n), 2)) %>%
+          filter(!is.na(response)) %>%
+          filter(response == "Y")
+     
+}
+
+
+
+dk_plot_awareness_depts <- function(.data) {
+     
+     ggplot(.data, aes(x = item, 
+                       y = pct)) +
+          geom_col(fill = tfff.dark.green) +
+          geom_text(aes(label = percent(pct)),
+                    hjust = -.35,
+                    color = tfff.dark.green) +
+          coord_flip() +
+          dk_theme +
+          theme(axis.title = element_blank()) +
+          scale_y_continuous(limits = c(0, 1),
+                             labels = percent) +
+          theme(panel.grid.minor = element_blank()) +
+          facet_wrap(~group, ncol = 2)
+}
+```
+
+```{r fig.height = 2.5}
+dk_summarize_awareness_depts_single() %>%
+     dk_plot_awareness_depts()
+```
+
+```{r}
+dk_height <- 2.5
+```
+
+### By subgroup: Lives in Oregon
+
+```{r fig.width = 12, fig.height = dk_height * 3}
+dk_summarize_awareness_depts_multiple(lives_in_oregon) %>%
+     dk_plot_awareness_depts()
+
+```
+
+### By subgroup: Rural
+
+```{r fig.width = 12, fig.height = dk_height * 4}
+dk_summarize_awareness_depts_multiple(rural_or_not) %>%
+     dk_plot_awareness_depts()
+
+```
+
+
+### By subgroup: Years since graduation
+
+```{r fig.width = 12, fig.height = dk_height * 6}
+dk_summarize_awareness_depts_multiple(years_since_grad_grouped) %>%
+     dk_plot_awareness_depts()
+
+```
+
+
+### By subgroup: Highest level of education
+
+```{r fig.width = 12, fig.height = dk_height * 6}
+dk_summarize_awareness_depts_multiple(highest_level_of_education_completed_or_in_progress) %>%
+     dk_plot_awareness_depts()
+
+```
+
+
+### By subgroup: Age
+
+```{r fig.width = 12, fig.height = dk_height * 6}
+dk_summarize_awareness_depts_multiple(age_groups) %>%
+     dk_plot_awareness_depts()
+
+```
+
+
+### By subgroup: Scholarship type
+
+```{r fig.width = 12, fig.height = dk_height * 4}
+dk_summarize_awareness_depts_multiple(under_which_ford_family_program_did_you_receive_your_scholarship) %>%
+     dk_plot_awareness_depts()
+
+```
+
+
