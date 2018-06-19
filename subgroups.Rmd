@@ -365,7 +365,8 @@ dk_plot_awareness <- function(.data) {
                     fontface = "bold") +
           dk_theme +
           labs(fill = "") +
-          scale_y_continuous(limits = c(0, 1.15)) +
+          scale_y_continuous(limits = c(0, 1.15),
+                             labels = percent) +
           theme(axis.title = element_blank())
 }
 
@@ -1140,6 +1141,8 @@ dk_summarize_participated_multiple(under_which_ford_family_program_did_you_recei
 
 ## How interested are you in engaging with the alumni association?
 
+Note: The percentage shown are those who said they are "somewhat interested" or "very interested."
+
 ```{r}
 dk_summarize_engaging_alum_single <- function() {
      data %>%
@@ -1254,6 +1257,9 @@ dk_summarize_engaging_alum_multiple(under_which_ford_family_program_did_you_rece
 
 
 ## How interested are you in being engaged with The Ford Family Foundation?
+
+Note: The percentage shown are those who said they are "somewhat interested" or "very interested."
+
 ```{r}
 dk_summarize_engaging_tfff_single <- function() {
      data %>%
