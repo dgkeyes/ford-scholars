@@ -335,6 +335,8 @@ dk_height <- 8
 
 ## Prior to receiving the email for this survey, were you aware of the existence of the Ford Scholar Alumni Association?
 
+Note: Percentage is those who said yes. 
+
 ```{r}
 dk_summarize_awareness_single <- function() {
      
@@ -382,6 +384,7 @@ dk_summarize_awareness_multiple <- function(group_col) {
                  !!rlang::ensym(group_col)) %>%
           summarize(n = n()) %>%
           na.omit() %>%
+          group_by(!!rlang::ensym(group_col)) %>%
           mutate(pct = round(prop.table(n), 2)) %>%
           ungroup() %>%
           set_names(c("response", "group", "n", "pct")) %>%
@@ -473,6 +476,7 @@ dk_summarize_communications_single <- function() {
           mutate(response = ifelse(response == "No", "No", "Yes")) %>%
           group_by(item, response) %>%
           summarize(n = n()) %>%
+          filter(!is.na(response)) %>%
           mutate(pct = round(prop.table(n), digits = 2)) %>%
           ungroup() %>%
           mutate(item = factor(item, levels = rev(c("Quarterly e-newsletter",
@@ -506,6 +510,7 @@ dk_summarize_communications_multiple <- function(group_col) {
           mutate(response = ifelse(response == "No", "No", "Yes")) %>%
           group_by(item, group) %>%
           count(response) %>%
+          filter(!is.na(response)) %>%
           mutate(pct = round(prop.table(n), digits = 2)) %>%
           ungroup() %>%
           mutate(item = factor(item, levels = rev(c("Quarterly e-newsletter",
@@ -756,6 +761,7 @@ dk_summarize_participate_opportunities_single <- function() {
                                    "Y", "N")) %>%
           group_by(item, response) %>%
           summarize(n = n()) %>%
+          filter(!is.na(response)) %>%
           mutate(pct = round(prop.table(n), 2)) %>%
           filter(response == "Y") %>%
           ungroup() %>%
@@ -784,6 +790,8 @@ dk_summarize_participate_opportunities_multiple <- function(group_col) {
                                    "Y", "N")) %>%
           group_by(item, response, group) %>%
           summarize(n = n()) %>%
+          group_by(group, item) %>%
+          filter(!is.na(response)) %>%
           mutate(pct = round(prop.table(n), 2)) %>%
           filter(response == "Y") %>%
           ungroup() %>%
@@ -1010,6 +1018,8 @@ dk_summarize_reasons_for_engaging_multiple(under_which_ford_family_program_did_y
 
 ## Have you participated in past alumni association events?
 
+Note: Percentage is those who said they had participated in events. 
+
 ```{r}
 dk_summarize_participated_single <- function() {
      data %>%
@@ -1048,6 +1058,7 @@ dk_summarize_participated_multiple <- function(group_col) {
                                     "Yes")) %>%
           group_by(item, response, group) %>%
           summarize(n = n()) %>%
+          group_by(item, group) %>%
           mutate(pct = round(prop.table(n), digits = 2)) %>%
           filter(response == "Yes") 
 }
@@ -1148,6 +1159,7 @@ dk_summarize_engaging_alum_single <- function() {
      data %>%
           select(how_interested_are_you_in_engaging_with_the_alumni_association) %>%
           gather(key = "item", value = "response") %>%
+          filter(!is.na(response)) %>%
           mutate(response = ifelse(response == "Somewhat interested" |
                                         response == "Very interested",
                                    "Y", "N")) %>%
@@ -1164,6 +1176,7 @@ dk_summarize_engaging_alum_multiple <- function(group_col) {
                  !!rlang::ensym(group_col)) %>%
           set_names(c("item", "group")) %>%
           gather(key = "item", value = "response", -group) %>%
+          filter(!is.na(response)) %>%
           mutate(response = ifelse(response == "Somewhat interested" |
                                         response == "Very interested",
                                    "Y", "N")) %>%
@@ -1265,11 +1278,14 @@ dk_summarize_engaging_tfff_single <- function() {
      data %>%
           select(how_interested_are_you_in_being_engaged_with_the_ford_family_foundation) %>%
           gather(key = "item", value = "response") %>%
+                    filter(!is.na(response)) %>%
           mutate(response = ifelse(response == "Somewhat interested" |
                                         response == "Very interested",
                                    "Y", "N")) %>%
           group_by(item, response) %>%
+
           summarize(n = n()) %>%
+          filter(!is.na(response)) %>%
           mutate(pct = round(prop.table(n), 2)) %>%
           filter(response == "Y") %>%
           mutate(group = "All respondents") 
@@ -1281,13 +1297,13 @@ dk_summarize_engaging_tfff_multiple <- function(group_col) {
                  !!rlang::ensym(group_col)) %>%
           set_names(c("item", "group")) %>%
           gather(key = "item", value = "response", -group) %>%
+          filter(!is.na(response)) %>%
           mutate(response = ifelse(response == "Somewhat interested" |
                                         response == "Very interested",
                                    "Y", "N")) %>%
           group_by(group, response) %>%
           summarize(n = n()) %>%
           mutate(pct = round(prop.table(n), 2)) %>%
-          filter(!is.na(response)) %>%
           filter(response == "Y")
 }
 
@@ -1389,13 +1405,13 @@ dk_summarize_awareness_depts_single <- function() {
                       "Postsecondary Success",
                       "Visual Arts")) %>%
           gather(key = "item", value = "response") %>%
+          filter(!is.na(response)) %>%
           mutate(response = ifelse(response == "Fairly aware" |
                                         response == "I know this work well",
                                    "Y", "N")) %>%
           group_by(item, response) %>%
           summarize(n = n()) %>%
           mutate(pct = round(prop.table(n), 2)) %>%
-          filter(!is.na(response)) %>%
           filter(response == "Y") %>%
           mutate(group = "All respondents")
      
@@ -1406,21 +1422,25 @@ dk_summarize_awareness_depts_multiple <- function(group_col) {
      data %>%
           select(contains("how_aware_are_you_about"),
                  !!rlang::ensym(group_col)) %>%
-          set_names(c("FICB",
-                      "Community Economic Development",
-                      "Children, Youth, and Families",
-                      "Postsecondary Success",
-                      "Visual Arts",
-                      "group")) %>%
-          gather(key = "item", value = "response", -group) %>%
-          mutate(response = ifelse(response == "Fairly aware" |
-                                        response == "I know this work well",
-                                   "Y", "N")) %>%
-          group_by(response, group, item) %>%
-          summarize(n = n()) %>%
-          mutate(pct = round(prop.table(n), 2)) %>%
-          filter(!is.na(response)) %>%
-          filter(response == "Y")
+           set_names(c("FICB",
+                 "Community Economic Development",
+                 "Children, Youth, and Families",
+                 "Postsecondary Success",
+                 "Visual Arts",
+                 "group")) %>%
+     gather(key = "item", value = "response", -group) %>%
+     filter(!is.na(response)) %>%
+     mutate(response = ifelse(response == "Fairly aware" |
+                                   response == "I know this work well",
+                              "Y", "N")) %>%
+     group_by(response, group, item) %>%
+     summarize(n = n()) %>%
+     ungroup() %>%
+     group_by(group, item) %>%
+     filter(!is.na(response)) %>%
+     mutate(pct = round(prop.table(n), 2)) %>%
+     arrange(group, item, response) %>%
+     filter(response == "Y")
      
 }
 
