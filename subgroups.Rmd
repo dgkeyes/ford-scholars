@@ -887,25 +887,26 @@ dk_summarize_participate_opportunities_multiple(under_which_ford_family_program_
 
 
 
-## Rank from most important to least, from your perspective, the following reasons for engaging with the alumni association.
+## Rank from least important to most important, from your perspective, the following reasons for engaging with the alumni association.
 
-The results below show the average rating for each item (this is different from how I presented it previously).
+Note: The question was asked in reverse (people ranked from most to least important), but I reversed the answers for ease of understanding.
 
 ```{r}
 dk_summarize_reasons_for_engaging_single <- function() {
      
-     data %>%
-          select(contains("reasons_for_engaging")) %>%
-          select(-reasons_for_engaging_with_alumni_assocation_is_there_anything_not_listed_in_question_13_that_would_motivate_you_to_participate_in_alumni_activities) %>%
-          set_names(c("Professional networking",
-                      "Community service",
-                      "Building community",
-                      "Leadership development",
-                      "Connection to and support of TFFF")) %>%
-          gather(key = "item", value = "response") %>%
-          group_by(item) %>%
-          summarize(avg = round(mean(response, na.rm = TRUE), 1)) %>%
-          mutate(group = "All respondents")
+    data %>%
+     select(contains("reasons_for_engaging")) %>%
+     select(-reasons_for_engaging_with_alumni_assocation_is_there_anything_not_listed_in_question_13_that_would_motivate_you_to_participate_in_alumni_activities) %>%
+     set_names(c("Professional networking",
+                 "Community service",
+                 "Building community",
+                 "Leadership development",
+                 "Connection to and support of TFFF")) %>%
+     gather(key = "item", value = "response") %>%
+     mutate(response = 6 - response) %>%
+     group_by(item) %>%
+     summarize(avg = round(mean(response, na.rm = TRUE), 1)) %>%
+     mutate(group = "All respondents")
      
 }
 
@@ -928,6 +929,7 @@ dk_summarize_reasons_for_engaging_multiple <- function(group_col) {
                       "Connection to and support of TFFF",
                       "group")) %>%
           gather(key = "item", value = "response", -group) %>%
+          mutate(response = 6 - response) %>%
           group_by(item, group) %>%
           summarize(avg = round(mean(response, na.rm = TRUE), 1))
      
