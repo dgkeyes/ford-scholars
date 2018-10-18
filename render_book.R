@@ -21,6 +21,6 @@ gitbook(split_by = "section+number",
 
 render_book("subgroups.Rmd", 
             "bookdown::gitbook", 
-            output_dir = "subgroups",
+            output_dir = "report",
             clean = TRUE)
 
